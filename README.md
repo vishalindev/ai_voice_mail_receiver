@@ -1,57 +1,70 @@
-# AI Voice Mail Receiver (Flutter + Android Native)
+# Flutter Auto-Responder (Android)
 
-This project provides a Flutter UI with Android-native call screening logic for ISP calls.
+This project is a Flutter + Kotlin Android implementation of a personal auto-answering machine.
 
-## Features
+## What it does
 
-- Toggle automatic ISP call handling.
-- Save multiple ISP phone numbers.
-- Native `CallScreeningService` rejects matching calls.
-- Sends auto SMS after rejection:
-  - "Hi, I am currently unavailable. Please leave a voicemail or message your issue."
-- Attempts short call-adjacent recording (device-policy dependent on Android 10+).
-- Stores call handling logs in SQLite via Flutter (`sqflite`).
-- Streams native events to Flutter UI through `MethodChannel` + `EventChannel`.
-- Playback feature for local recordings from Flutter UI.
-- Notification when ISP calls are auto-handled.
+- Flutter UI has:
+  - Toggle: **Enable Auto-Responder**
+  - Read-only text field showing call logs/events
+- Android native uses:
+  - `CallScreeningService` to detect incoming calls
+  - Broadcast receiver to track call state transitions
+  - Foreground service (`phoneCall` type) to survive ringing window
+  - `TelecomManager.acceptRingingCall()` when conditions match
+  - `MediaPlayer` + `AudioManager.MODE_IN_COMMUNICATION` to play instruction audio
 
-## Project Structure
+## Auto-answer logic
 
-- `lib/`: Flutter app, controllers, database, UI, platform bridge.
-- `android/app/src/main/kotlin/...`: Native services and handlers.
+When enabled:
+1. Incoming call is detected.
+2. App auto-answers if either:
+   - call rings for ~15 seconds (~4 rings), or
+   - same number has a second missed call within 5 minutes.
+3. After answer, app plays `voicemail_instruction.mp3` (Android `res/raw/voicemail_instruction.mp3`).
 
-## Android Setup
+Prompt text used by design:
 
-1. Open app settings and set this app as the default **Call Screening app** on Android.
-2. Grant required permissions at runtime.
-3. Exempt app from aggressive battery optimization if device vendor kills background services.
+> "This is an automated service for Vishal. I cannot take your call right now, please leave a message."
 
-## Required Permissions
+## Important Android constraints (Android 10+ through Android 16)
 
-Declared in `AndroidManifest.xml`:
+- App must be granted **ROLE_DIALER** by user, otherwise `acceptRingingCall()` usually fails.
+- Android security does not allow direct injection of MP3 into cellular uplink microphone path.
+- This implementation uses the practical workaround:
+  - answer call
+  - set communication audio mode
+  - play audio through speaker/communication route
+- Foreground service restrictions on modern Android require `foregroundServiceType="phoneCall"`.
+
+## Manifest permissions included
 
 - `READ_PHONE_STATE`
 - `ANSWER_PHONE_CALLS`
-- `READ_CALL_LOG`
+- `MODIFY_AUDIO_SETTINGS`
+- `BIND_SCREENING_SERVICE`
+- `MANAGE_OWN_CALLS`
 - `RECORD_AUDIO`
-- `SEND_SMS`
 - `FOREGROUND_SERVICE`
+- `FOREGROUND_SERVICE_PHONE_CALL`
 - `POST_NOTIFICATIONS`
 
-> Note: On Android 10+ and some OEM devices, call audio capture may be blocked. App logs fallback status as `handled_no_recording` when recording is unavailable.
+## Flutter ↔ Native MethodChannel API
 
-## Flutter ↔ Native Bridge
+Method channel: `auto_responder/methods`
 
-- Method channel: `isp_auto_handler/methods`
-  - `updateIspNumbers`
-  - `setAutoHandling`
-  - `requestPermissions`
-- Event channel: `isp_auto_handler/events`
-  - Emits `phoneNumber`, `timestamp`, `recordingPath`, `status`
+- `setAutoResponderEnabled({enabled: bool})`
+- `requestDialerRole()`
+- `requestPermissions()`
 
-## Run
+Event channel: `auto_responder/events`
 
-```bash
-flutter pub get
-flutter run
-```
+- Emits timestamped log lines to show in Flutter text field.
+
+## Setup
+
+1. Add your MP3 at: `android/app/src/main/res/raw/voicemail_instruction.mp3`
+2. Install and run app.
+3. Tap **Request ROLE_DIALER** and approve.
+4. Tap **Request Permissions** and grant all requested permissions.
+5. Enable **Auto-Responder**.

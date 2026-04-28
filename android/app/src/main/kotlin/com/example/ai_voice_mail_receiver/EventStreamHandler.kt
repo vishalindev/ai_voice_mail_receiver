@@ -13,7 +13,7 @@ object EventStreamHandler : EventChannel.StreamHandler {
         sink = null
     }
 
-    fun emit(event: Map<String, Any?>) {
-        sink?.success(event)
+    fun emit(event: String) {
+        sink?.success("${System.currentTimeMillis()}: $event")
     }
 }

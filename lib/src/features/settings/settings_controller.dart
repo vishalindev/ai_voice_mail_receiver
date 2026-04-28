@@ -4,41 +4,24 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../platform/native_bridge.dart';
 
 class SettingsController extends ChangeNotifier {
-  bool autoHandlingEnabled = false;
-  final List<String> ispNumbers = [];
+  bool enabled = false;
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
-    autoHandlingEnabled = prefs.getBool('autoHandlingEnabled') ?? false;
-    ispNumbers
-      ..clear()
-      ..addAll(prefs.getStringList('ispNumbers') ?? []);
-    await NativeBridge.instance.setAutoHandling(autoHandlingEnabled);
-    await NativeBridge.instance.updateIspNumbers(ispNumbers);
+    enabled = prefs.getBool('autoResponderEnabled') ?? false;
+    await NativeBridge.instance.setAutoResponderEnabled(enabled);
     notifyListeners();
   }
 
-  Future<void> toggleAutoHandling(bool enabled) async {
-    autoHandlingEnabled = enabled;
+  Future<void> setEnabled(bool value) async {
+    enabled = value;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('autoHandlingEnabled', enabled);
-    await NativeBridge.instance.setAutoHandling(enabled);
+    await prefs.setBool('autoResponderEnabled', enabled);
+    await NativeBridge.instance.setAutoResponderEnabled(enabled);
     notifyListeners();
   }
 
-  Future<void> saveIspNumbers(String rawInput) async {
-    final next = rawInput
-        .split(RegExp(r'[,\n]'))
-        .map((value) => value.trim())
-        .where((value) => value.isNotEmpty)
-        .toSet()
-        .toList();
-    ispNumbers
-      ..clear()
-      ..addAll(next);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList('ispNumbers', ispNumbers);
-    await NativeBridge.instance.updateIspNumbers(ispNumbers);
-    notifyListeners();
-  }
+  Future<void> requestDialerRole() => NativeBridge.instance.requestDialerRole();
+
+  Future<void> requestPermissions() => NativeBridge.instance.requestPermissions();
 }
