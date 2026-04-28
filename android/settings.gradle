@@ -1,0 +1,2 @@
+rootProject.name = 'ai_voice_mail_receiver'
+include ':app'
